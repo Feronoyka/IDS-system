@@ -46,6 +46,7 @@ live_ids_watcher.py — модуль реального времени: дете
 """
 
 import argparse
+import csv
 import glob
 import os
 import subprocess
@@ -117,37 +118,50 @@ class FlowFileWatcher:
         self.flows_dir = flows_dir
         self.positions = {}  # путь к файлу -> байтовая позиция, до которой уже прочитано
         self.headers = {}  # путь к файлу -> список колонок (из первой строки)
+        self.pending = {}  # путь к файлу -> неполная строка до конца порции чтения
 
     def poll_new_rows(self):
         rows = []
         for path in glob.glob(os.path.join(self.flows_dir, "*.csv")):
             size = os.path.getsize(path)
             last_pos = self.positions.get(path, 0)
+            if size < last_pos:
+                # Файл был удалён/перезаписан: начинаем чтение заново.
+                last_pos = 0
+                self.positions.pop(path, None)
+                self.headers.pop(path, None)
+                self.pending.pop(path, None)
             if size <= last_pos:
                 continue  # ничего нового не дописано
 
             with open(path, "r", encoding="utf-8", errors="ignore") as f:
                 f.seek(last_pos)
-                new_lines = f.read()
+                chunk = f.read()
                 self.positions[path] = f.tell()
 
-            if path not in self.headers:
-                # первая порция чтения этого файла — первая строка это заголовок
-                lines = new_lines.splitlines()
-                if not lines:
-                    continue
-                self.headers[path] = [c.strip() for c in lines[0].split(",")]
-                data_lines = lines[1:]
-            else:
-                data_lines = new_lines.splitlines()
+            text = self.pending.pop(path, "") + chunk
+            lines = text.splitlines(keepends=True)
+            if lines and not lines[-1].endswith(("\n", "\r")):
+                self.pending[path] = lines.pop()
 
-            header = self.headers[path]
-            for line in data_lines:
-                if not line.strip():
+            for raw_line in lines:
+                line = raw_line.strip("\r\n")
+                if not line:
                     continue
-                values = line.split(",")
+                try:
+                    values = next(csv.reader([line]))
+                except (csv.Error, StopIteration):
+                    continue
+
+                if path not in self.headers:
+                    self.headers[path] = [value.strip() for value in values]
+                    continue
+
+                header = self.headers[path]
                 if len(values) != len(header):
                     continue  # битая/неполная строка, пропускаем
+                if values == header:
+                    continue  # повторяющийся заголовок при ротации или append
                 rows.append(dict(zip(header, values)))
 
         return rows

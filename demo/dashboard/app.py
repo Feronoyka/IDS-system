@@ -38,115 +38,6 @@ PAGE = """<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Digital Detective — дашборд</title>
 <style>
-  :root {
-    --bg: #0a0e16;
-    --panel: #121826;
-    --panel-2: #0d1220;
-    --border: #212b42;
-    --text: #e8ecf4;
-    --muted: #7c8aa8;
-    --accent: #5b8cff;
-    --accent-dim: #2a3a66;
-    --good: #35d08e;
-    --good-dim: #0f3b2a;
-    --bad: #ff5d7a;
-    --bad-dim: #3a1420;
-    --warn: #ffb648;
-    --warn-dim: #3a2a10;
-  }
-  * { box-sizing: border-box; }
-  body {
-    font-family: -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
-    margin: 0; padding: 28px 32px 40px;
-    background: radial-gradient(1200px 600px at 10% -10%, #10182c 0%, var(--bg) 55%);
-    color: var(--text);
-    min-height: 100vh;
-  }
-  header { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 22px; }
-  h1 { font-size: 21px; margin: 0 0 6px; font-weight: 600; letter-spacing: .2px; }
-  .muted { color: var(--muted); font-size: 13px; max-width: 640px; line-height: 1.5; }
-
-  .status-pill {
-    display: inline-flex; align-items: center; gap: 8px;
-    background: var(--panel); border: 1px solid var(--border);
-    border-radius: 999px; padding: 7px 14px 7px 10px;
-    font-size: 12.5px; color: var(--muted);
-    box-shadow: 0 6px 18px -8px rgba(0,0,0,.6);
-  }
-  .status-pill b { color: var(--text); font-weight: 600; }
-  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; flex: none; }
-  .dot.on { background: var(--good); box-shadow: 0 0 0 3px var(--good-dim), 0 0 10px var(--good); animation: pulse 1.8s ease-in-out infinite; }
-  .dot.off { background: #5a6478; }
-  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
-
-  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 22px; }
-  .stat { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
-  .stat .k { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 6px; }
-  .stat .v { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
-  .stat.attacks .v { color: var(--bad); }
-  .stat.ok .v { color: var(--good); }
-
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-  @media (max-width: 920px) { .grid { grid-template-columns: 1fr; } .stats { grid-template-columns: repeat(2,1fr); } }
-
-  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 16px; box-shadow: 0 10px 30px -14px rgba(0,0,0,.7); display: flex; flex-direction: column; min-height: 0; }
-  .panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-  .panel h2 { font-size: 14px; margin: 0; color: var(--text); font-weight: 600; }
-  .panel .count { font-size: 11.5px; color: var(--muted); background: var(--panel-2); border: 1px solid var(--border); border-radius: 999px; padding: 2px 9px; }
-
-  .table-scroll { overflow: auto; max-height: 520px; border-radius: 8px; }
-  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-  thead th { position: sticky; top: 0; background: var(--panel-2); color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 10.5px; letter-spacing: .5px; }
-  th, td { text-align: left; padding: 7px 9px; border-bottom: 1px solid var(--border); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 240px; }
-  tbody tr:hover { background: rgba(255,255,255,.03); }
-  .ip, .mono { font-family: "SF Mono", "Cascadia Code", Consolas, monospace; font-size: 12px; }
-
-  .badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 999px; letter-spacing: .2px; }
-  .badge.benign { background: var(--good-dim); color: var(--good); }
-  .badge.attack { background: var(--bad-dim); color: var(--bad); }
-  .badge.flood  { background: var(--warn-dim); color: var(--warn); }
-  .badge.neutral{ background: var(--panel-2); color: var(--muted); border: 1px solid var(--border); }
-
-  tr.row-attack { background: linear-gradient(90deg, rgba(255,93,122,.10), transparent 60%); }
-
-  .empty { color: var(--muted); font-style: italic; font-size: 12.5px; padding: 18px 4px; }
-  footer { margin-top: 22px; color: var(--muted); font-size: 11.5px; }
-  footer code { background: var(--panel-2); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; }
-</style>
-</head>
-<body>
-<header>
-  <div>
-    <h1>Digital Detective — живой дашборд</h1>
-    <p class="muted">Слева — кто и как заходил на мок-сайт по HTTP. Справа — вердикт сетевого IDS по каждому
-      TCP/UDP-потоку на интерфейсе (захват + расчёт признаков + ML-модель — всё в <code>live_capture_engine.py</code>,
-      без CICFlowMeter/Java). Обновление каждые 1.5 сек.</p>
-  </div>
-  <div class="status-pill" id="statusPill">
-    <span class="dot off" id="statusDot"></span>
-    <span id="statusText">проверка движка…</span>
-  </div>
-</header>
-
-<div class="stats">
-  <div class="stat"><div class="k">HTTP-запросов</div><div class="v" id="statReq">0</div></div>
-  <div class="stat"><div class="k">Потоков проанализировано</div><div class="v" id="statFlows">0</div></div>
-  <div class="stat attacks"><div class="k">Атак обнаружено</div><div class="v" id="statAttacks">0</div></div>
-  <div class="stat ok"><div class="k">Мониторинг с</div><div class="v" id="statSince" style="font-size:16px">—</div></div>
-</div>
-
-<div class="panel" id="alertsPanel" style="margin-bottom:18px">
-  <div class="panel-head">
-    <h2>Алерты правил — PortScan / DDoS (межпотоковые паттерны, не видны ML построчно)</h2>
-    <span class="count" id="alertsCount">0</span>
-  </div>
-  <div class="table-scroll" style="max-height:220px">
-    <table id="alertsTable"><thead><tr>
-      <th>Время</th><th>Источник</th><th>Назначение</th><th>Вердикт</th>
-    </tr></thead><tbody></tbody></table>
-  </div>
-  <div id="alertsEmpty" class="empty">Пока нет алертов — например, запусти <code>nmap -p 1-2000 127.0.0.1</code> или кнопку «Симулировать DDoS» на мок-сайте.</div>
-</div>
 
 <div class="grid">
   <div class="panel">
@@ -173,53 +64,16 @@ PAGE = """<!doctype html>
     <div id="idsEmpty" class="empty" style="display:none">Пока нет событий — запусти <code>live_capture_engine.py</code> (см. README).</div>
   </div>
 </div>
+<div class="grid grid-wide" style="margin-top:20px">
+  <div class="panel">
+    <h2>Атаки по времени (последние 24 часа)</h2>
+    <canvas id="attackChart" width="900" height="220" style="width:100%;height:220px"></canvas>
+  </div>
+</div>
 
 <footer>Источники: <code>demo/logs/target_requests.log</code> · <code>ids-project/ids_events.log</code> · <code>ids-project/live_engine.status</code></footer>
 
 <script>
-function esc(s) {
-  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
-
-function verdictBadge(v) {
-  if (!v) return '<span class="badge neutral">?</span>';
-  if (v === 'BENIGN') return '<span class="badge benign">BENIGN</span>';
-  if (/ddos|dos|flood/i.test(v)) return `<span class="badge flood">${esc(v)}</span>`;
-  return `<span class="badge attack">${esc(v)}</span>`;
-}
-
-async function refreshRequests() {
-  const reqs = await (await fetch('/api/requests')).json();
-  const reqBody = document.querySelector('#reqTable tbody');
-  reqBody.innerHTML = '';
-  document.querySelector('#reqEmpty').style.display = reqs.length ? 'none' : 'block';
-  document.querySelector('#reqCount').textContent = reqs.length;
-  for (const r of reqs.slice().reverse()) {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td class="mono">${esc(r.ts)}</td><td class="ip">${esc(r.ip)}</td>` +
-      `<td>${esc(r.method)}</td><td>${esc(r.path)}</td><td>${esc(r.tag)}</td>`;
-    reqBody.appendChild(tr);
-  }
-}
-
-async function refreshIds() {
-  const events = await (await fetch('/api/ids_events')).json();
-  const idsBody = document.querySelector('#idsTable tbody');
-  idsBody.innerHTML = '';
-  document.querySelector('#idsEmpty').style.display = events.length ? 'none' : 'block';
-  document.querySelector('#idsCount').textContent = events.length;
-  for (const e of events.slice().reverse()) {
-    const tr = document.createElement('tr');
-    if (e.verdict && e.verdict !== 'BENIGN') tr.className = 'row-attack';
-    if (e.raw) {
-      tr.innerHTML = `<td class="mono">${esc(e.ts)}</td><td colspan="7">${esc(e.raw)}</td>`;
-    } else {
-      const src = `${esc(e.src_ip)}<span class="mono" style="color:var(--muted)">:${esc(e.src_port)}</span>`;
-      const dst = `${esc(e.dst_ip)}<span class="mono" style="color:var(--muted)">:${esc(e.dst_port)}</span>`;
-      tr.innerHTML = `<td class="mono">${esc(e.ts)}</td><td class="mono">${esc(e.proto)}</td>` +
-        `<td class="ip">${src}</td><td class="ip">${dst}</td>` +
-        `<td class="mono">${esc(e.packets)}</td><td class="mono">${esc(e.bytes)}</td>` +
-        `<td class="mono">${esc(e.duration_ms)}</td><td>${verdictBadge(e.verdict)}</td>`;
     }
     idsBody.appendChild(tr);
   }
@@ -244,19 +98,6 @@ async function refreshStatus() {
   const dot = document.querySelector('#statusDot');
   const text = document.querySelector('#statusText');
   try {
-    const s = await (await fetch('/api/engine_status')).json();
-    if (s.running) {
-      dot.className = 'dot on';
-      text.innerHTML = `живой захват активен на <b>${esc(s.iface)}</b>`;
-      document.querySelector('#statSince').textContent = (s.started_at ?? '—').replace('T', ' ');
-    } else if (s.known) {
-      dot.className = 'dot off';
-      text.textContent = 'движок остановлен';
-      document.querySelector('#statSince').textContent = '—';
-    } else {
-      dot.className = 'dot off';
-      text.textContent = 'движок не запущен';
-      document.querySelector('#statSince').textContent = '—';
     }
     document.querySelector('#statFlows').textContent = s.flows_total ?? 0;
     document.querySelector('#statAttacks').textContent = s.attacks_total ?? 0;
@@ -272,6 +113,26 @@ async function refresh() {
   await Promise.allSettled([refreshRequests(), refreshIds(), refreshAlerts(), refreshStatus()]);
   document.querySelector('#statReq').textContent = document.querySelector('#reqCount').textContent;
 }
+
+function exportCsv() {
+  const lines = [['time', 'event'], ...currentEvents.map(line => {
+    const m = line.match(/^\\[(.*?)\\]\\s*(.*)$/);
+    return [m ? m[1] : '', m ? m[2] : line];
+  })];
+  const csv = lines.map(row => row.map(value => {
+    const text = String(value ?? '').replace(/"/g, '""');
+    return `"${text}"`;
+  }).join(',')).join('\\n');
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(new Blob([csv], {type: 'text/csv;charset=utf-8'}));
+  link.download = 'ids_events.csv';
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+document.querySelector('#eventFilter').addEventListener('input', refresh);
+document.querySelector('#eventType').addEventListener('change', refresh);
+document.querySelector('#exportCsv').addEventListener('click', exportCsv);
 refresh();
 setInterval(refresh, 1500);
 </script>
@@ -363,6 +224,30 @@ def api_rule_alerts():
 @app.route("/api/engine_status")
 def api_engine_status():
     return jsonify(_engine_status())
+
+
+@app.route("/api/summary")
+def api_summary():
+    events = _tail_lines(IDS_LOG, limit=5000)
+    verdict_lines = [
+        line for line in events
+        if "АТАКА:" in line or "BENIGN" in line
+    ]
+    attacks = sum("АТАКА:" in line for line in verdict_lines)
+    benign = sum("BENIGN" in line for line in verdict_lines)
+
+    blocked_ips = set()
+    for line in events:
+        match = re.search(r"ЗАБЛОКИРОВАН\s+([0-9A-Fa-f:.]+)", line)
+        if match:
+            blocked_ips.add(match.group(1))
+
+    return jsonify({
+        "total": len(verdict_lines),
+        "attacks": attacks,
+        "benign": benign,
+        "blocked_ips": len(blocked_ips),
+    })
 
 
 if __name__ == "__main__":
